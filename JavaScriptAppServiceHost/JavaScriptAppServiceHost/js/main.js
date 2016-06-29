@@ -21,7 +21,7 @@
           broker.addEventListener("connectionarrived", function (data) {
               console.debug("connection arrived");
           });
-          listeningToBroker -= true;
+          listeningToBroker = true;
       }
   }
 
