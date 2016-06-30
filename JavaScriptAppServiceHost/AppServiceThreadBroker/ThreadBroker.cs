@@ -13,14 +13,24 @@ using Windows.UI.Core;
 
 namespace AppServiceThreadBroker
 {
+    class PostedMessage<T>
+    {
+        public T Arguments;
+        public TaskCompletionSource<bool> Completion = new TaskCompletionSource<bool>();
+    }
+
     class ThreadBoundEventHandler<T>
     {
         public TaskFactory Context;
         public EventHandler<T> Handler;
 
-        public async Task SignalAsync(T obj)
+        public async Task SignalAsync(PostedMessage<T> message)
         {
-            await Context.StartNew(() => Handler.Invoke(null, obj));
+            await Context.StartNew(() =>
+            {
+                Handler.Invoke(null, message.Arguments);
+                message.Completion.SetResult(true);
+            });
         }
     }
 
@@ -69,7 +79,7 @@ namespace AppServiceThreadBroker
         }
 
         private static EventRegistrationToken BindHandlerToEventSource<T>(EventHandler<T> handler,
-            EventRegistrationTokenTable<EventHandler<T>> eventSource)
+            EventRegistrationTokenTable<EventHandler<PostedMessage<T>>> eventSource)
         {
             // Wrap the incoming EventHandler such that we will call it
             // back on the same synchronization context in which the event was added
@@ -78,9 +88,9 @@ namespace AppServiceThreadBroker
                 Handler = handler,
                 Context = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext())
             };
-            var eventHandlerThunk = new EventHandler<T>(async (_, obj) =>
+            var eventHandlerThunk = new EventHandler<PostedMessage<T>>(async (_, message) =>
             {
-                await boundEventHandler.SignalAsync(obj);
+                await boundEventHandler.SignalAsync(message);
             });
 
             lock (eventSource)
@@ -90,19 +100,20 @@ namespace AppServiceThreadBroker
             }
         }
 
-        private static IAsyncAction PostToEventSource<T>(T obj, EventRegistrationTokenTable<EventHandler<T>> eventSource)
+        private static IAsyncAction PostToEventSource<T>(T obj, EventRegistrationTokenTable<EventHandler<PostedMessage<T>>> eventSource)
         {
+            PostedMessage<T> message = new PostedMessage<T> { Arguments = obj };
             var task = Task.Run(() =>
             {
-                eventSource.InvocationList?.Invoke(null, obj);
+                eventSource.InvocationList?.Invoke(null, message);
             });
-            return task.AsAsyncAction();
+            return message.Completion.Task.AsAsyncAction();
         }
 
-        static EventRegistrationTokenTable<EventHandler<AppServiceConnection>> _connectionArrivedEventSource
-            = new EventRegistrationTokenTable<EventHandler<AppServiceConnection>>();
+        static EventRegistrationTokenTable<EventHandler<PostedMessage<AppServiceConnection>>> _connectionArrivedEventSource
+            = new EventRegistrationTokenTable<EventHandler<PostedMessage<AppServiceConnection>>>();
 
-        static EventRegistrationTokenTable<EventHandler<AppServiceConnection>> _connectionDoneEventSource
-            = new EventRegistrationTokenTable<EventHandler<AppServiceConnection>>();
+        static EventRegistrationTokenTable<EventHandler<PostedMessage<AppServiceConnection>>> _connectionDoneEventSource
+            = new EventRegistrationTokenTable<EventHandler<PostedMessage<AppServiceConnection>>>();
     }
 }
