@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" IgnorableNamespaces="uap mp">
-  <Identity Name="ddf1732b-1e76-4cf8-92ef-cf02408ff6cd" Version="1.0.0.0" Publisher="CN=johng" />
+  <Identity Name="ddf1732b-1e76-4cf8-92ef-cf02408ff6cd" Version="1.0.0.0" Publisher="CN=John" />
   <mp:PhoneIdentity PhoneProductId="ddf1732b-1e76-4cf8-92ef-cf02408ff6cd" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
     <DisplayName>JavaScriptAppServiceHost</DisplayName>
@@ -21,7 +21,7 @@
         <uap:SplashScreen Image="images\splashscreen.png" />
       </uap:VisualElements>
       <Extensions>
-        <uap:Extension Category="windows.appService" StartPage="js/appServiceImpl.js" Executable="wwahost.exe">
+        <uap:Extension Category="windows.appService" Executable="wwahost.exe" StartPage="js/appServiceImpl.js">
           <uap:AppService Name="JavaScriptService" />
         </uap:Extension>
       </Extensions>

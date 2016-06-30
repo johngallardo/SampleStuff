@@ -72,14 +72,14 @@ namespace AppServiceThreadBroker
 
     public static class ThreadBroker
     {
-        public static IAsyncAction PostConnectionArrived(AppServiceConnection connection)
+        public static IAsyncAction PostConnectionArrivedAsync(AppServiceConnection connection)
         {
-            return PostToEventSource(connection, _connectionArrivedEventSource);
+            return PostToEventSource(connection, _connectionArrivedEventSource).AsAsyncAction();
         }
 
-        public static IAsyncAction PostConnectionDone(AppServiceConnection connection)
+        public static IAsyncAction PostConnectionDoneAsync(AppServiceConnection connection)
         {
-            return PostToEventSource(connection, _connectionDoneEventSource);
+            return PostToEventSource(connection, _connectionDoneEventSource).AsAsyncAction();
         }
         
         public static event EventHandler<AppServiceConnection> ConnectionArrived
@@ -136,10 +136,10 @@ namespace AppServiceThreadBroker
             }
         }
 
-        private static IAsyncAction PostToEventSource<T>(T obj, EventRegistrationTokenTable<EventHandler<PostedMessage<T>>> eventSource)
+        private static async Task PostToEventSource<T>(T obj, EventRegistrationTokenTable<EventHandler<PostedMessage<T>>> eventSource)
         {
             PostedMessage<T> message = new PostedMessage<T> { Argument = obj };
-            var task = Task.Run(() =>
+            await Task.Run(() =>
             {
                 // If we have delegates bound to the event source, each one
                 // will get a fanned out PostedMessage. They will all get aggregated
@@ -151,7 +151,7 @@ namespace AppServiceThreadBroker
                 // invocation list.
                 message.Complete();
             });
-            return message.GetAggregatedTask().AsAsyncAction();
+            await message.GetAggregatedTask();
         }
 
         static EventRegistrationTokenTable<EventHandler<PostedMessage<AppServiceConnection>>> _connectionArrivedEventSource

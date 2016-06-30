@@ -54,6 +54,7 @@
     <MinimumVisualStudioVersion>$(VersionNumberMajor).$(VersionNumberMinor)</MinimumVisualStudioVersion>
     <DefaultLanguage>en-US</DefaultLanguage>
     <PackageCertificateKeyFile>JavaScriptAppServiceHost_TemporaryKey.pfx</PackageCertificateKeyFile>
+    <PackageCertificateThumbprint>5001DD130EAF2E8E95F8B032912F1CBEB7DC8402</PackageCertificateThumbprint>
   </PropertyGroup>
   <ItemGroup>
     <AppxManifest Include="package.appxmanifest">
