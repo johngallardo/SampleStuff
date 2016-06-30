@@ -1,15 +1,17 @@
 ﻿(function () {
     'use strict'; 
     var taskInstance = Windows.UI.WebUI.WebUIBackgroundTaskInstance.current;
+    var connection = taskInstance.triggerDetails.appServiceConnection;
 
     function done() {
-        close();
+        AppServiceThreadBroker.ThreadBroker.postConnectionDone(connection).then(function () {
+            close();
+        });
     }
 
     function run() {
         taskInstance.addEventListener("canceled", done);
-        var connection = taskInstance.triggerDetails.appServiceConnection;
-        AppServiceThreadBroker.ThreadBroker.signalNewConnectionArrived(connection);
+        AppServiceThreadBroker.ThreadBroker.postConnectionArrived(connection);
     }
 
     run();

@@ -17,9 +17,10 @@
               statusDiv.innerText = "Connection Arrived.";
           });
 
-          broker.addEventListener("connectionarrived", function (data) {
-              console.debug("connection arrived");
+          broker.addEventListener("connectiondone", function (data) {
+              statusDiv.innerText = "Connection Done.";
           });
+
           listeningToBroker = true;
       }
   }

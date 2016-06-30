@@ -13,56 +13,96 @@ using Windows.UI.Core;
 
 namespace AppServiceThreadBroker
 {
-    class ThreadBoundEventHandler
+    class ThreadBoundEventHandler<T>
     {
         public TaskFactory Context;
-        public EventHandler<AppServiceConnection> Handler;
-        public async Task SignalAsync(AppServiceConnection connection)
+        public EventHandler<T> Handler;
+
+        public async Task SignalAsync(T obj)
         {
-            await Context.StartNew(() => Handler.Invoke(null, connection));
+            await Context.StartNew(() => Handler.Invoke(null, obj));
         }
     }
 
     public static class ThreadBroker
     {
-        public static void SignalNewConnectionArrived(AppServiceConnection connection)
+        public static IAsyncAction PostConnectionArrived(AppServiceConnection connection)
         {
-            _handlerTable.InvocationList?.Invoke(null, connection);
+            return PostToEventSource(connection, _connectionArrivedEventSource);
         }
 
+        public static IAsyncAction PostConnectionDone(AppServiceConnection connection)
+        {
+            return PostToEventSource(connection, _connectionDoneEventSource);
+        }
+        
         public static event EventHandler<AppServiceConnection> ConnectionArrived
         {
             add
             {
-                // Wrap the incoming EventHandler such that we will call it
-                // back on the same synchronization context in which the event was added
-                var handler = new ThreadBoundEventHandler
-                {
-                    Handler = value,
-                    Context = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext())
-                };
-                var thunkedHandler = new EventHandler<AppServiceConnection>(async (_, connection) =>
-                {
-                    await handler.SignalAsync(connection);
-                });
-
-                lock (_handlerTable)
-                {
-                    var token = _handlerTable.AddEventHandler(thunkedHandler);
-                    return token;
-                }
+                return BindHandlerToEventSource(value, _connectionArrivedEventSource);
             }
 
             remove
             {
-                lock(_handlerTable)
+                lock(_connectionArrivedEventSource)
                 {
-                    _handlerTable.RemoveEventHandler(value);
+                    _connectionArrivedEventSource.RemoveEventHandler(value);
                 }
             }
         }
 
-        static EventRegistrationTokenTable<EventHandler<AppServiceConnection>> _handlerTable
+        public static event EventHandler<AppServiceConnection> ConnectionDone
+        {
+            add
+            {
+                return BindHandlerToEventSource(value, _connectionDoneEventSource);
+            }
+
+            remove
+            {
+                lock (_connectionArrivedEventSource)
+                {
+                    _connectionDoneEventSource.RemoveEventHandler(value);
+                }
+            }
+        }
+
+        private static EventRegistrationToken BindHandlerToEventSource<T>(EventHandler<T> handler,
+            EventRegistrationTokenTable<EventHandler<T>> eventSource)
+        {
+            // Wrap the incoming EventHandler such that we will call it
+            // back on the same synchronization context in which the event was added
+            var boundEventHandler = new ThreadBoundEventHandler<T>
+            {
+                Handler = handler,
+                Context = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext())
+            };
+            var eventHandlerThunk = new EventHandler<T>(async (_, obj) =>
+            {
+                await boundEventHandler.SignalAsync(obj);
+            });
+
+            lock (eventSource)
+            {
+                var token = eventSource.AddEventHandler(eventHandlerThunk);
+                return token;
+            }
+        }
+
+        private static IAsyncAction PostToEventSource<T>(T obj, EventRegistrationTokenTable<EventHandler<T>> eventSource)
+        {
+            var task = Task.Run(() =>
+            {
+                eventSource.InvocationList?.Invoke(null, obj);
+            });
+            return task.AsAsyncAction();
+        }
+
+        static EventRegistrationTokenTable<EventHandler<AppServiceConnection>> _connectionArrivedEventSource
+            = new EventRegistrationTokenTable<EventHandler<AppServiceConnection>>();
+
+        static EventRegistrationTokenTable<EventHandler<AppServiceConnection>> _connectionDoneEventSource
             = new EventRegistrationTokenTable<EventHandler<AppServiceConnection>>();
     }
 }
