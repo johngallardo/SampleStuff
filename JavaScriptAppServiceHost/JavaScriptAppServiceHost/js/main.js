@@ -9,8 +9,7 @@
       requestReceivedDiv.innerText = "Request Received, body = " + data.request.message.X1;
   }
 
-  function activate() {
-
+  function ensureListeningToBroker() {
       if (!listeningToBroker) {
           broker.addEventListener("connectionarrived", function (data) {
               var connection = data.detail[0];
@@ -33,7 +32,7 @@
         // Restore application state here.
       }
       args.setPromise(WinJS.UI.processAll().then(function () {
-          activate();
+          ensureListeningToBroker();
       }));
     }
   };
