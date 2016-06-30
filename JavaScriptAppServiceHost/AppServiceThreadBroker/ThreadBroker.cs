@@ -55,17 +55,16 @@ namespace AppServiceThreadBroker
 
         public void Post(PostedMessage<T> message)
         {
-            var instance = message.Fanout();
             Context.StartNew(() =>
             {
                 try
                 {
-                    Handler.Invoke(null, instance.Argument);
-                    instance.Complete();
+                    Handler.Invoke(null, message.Argument);
+                    message.Complete();
                 }
                 catch(Exception ex)
                 {
-                    instance.MarkError(ex);
+                    message.MarkError(ex);
                 }
             });
         }
@@ -127,7 +126,7 @@ namespace AppServiceThreadBroker
             };
             var eventHandlerThunk = new EventHandler<PostedMessage<T>>((_, message) =>
             {
-                boundEventHandler.Post(message);
+                boundEventHandler.Post(message.Fanout());
             });
 
             lock (eventSource)
