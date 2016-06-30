@@ -15,8 +15,37 @@ namespace AppServiceThreadBroker
 {
     class PostedMessage<T>
     {
+        public PostedMessage()
+        {
+            _fanoutTasks.Add(this._completion.Task);
+        }
+
         public T Argument;
-        public TaskCompletionSource<bool> Completion = new TaskCompletionSource<bool>();
+
+        public PostedMessage<T> Fanout()
+        {
+            var fanout = new PostedMessage<T> { Argument = this.Argument };
+            _fanoutTasks.Add(fanout._completion.Task);
+            return fanout;
+        }
+
+        public void Complete()
+        {
+            _completion.SetResult(true);
+        }
+
+        public void MarkError(Exception ex)
+        {
+            _completion.SetException(ex);
+        }
+
+        public Task GetAggregatedTask()
+        {
+            return Task.WhenAll(_fanoutTasks.ToArray());
+        }
+
+        private List<Task> _fanoutTasks = new List<Task>();
+        private TaskCompletionSource<bool> _completion = new TaskCompletionSource<bool>();
     }
 
     class ThreadBoundEventHandler<T>
@@ -24,12 +53,20 @@ namespace AppServiceThreadBroker
         public TaskFactory Context;
         public EventHandler<T> Handler;
 
-        public async Task SignalAsync(PostedMessage<T> message)
+        public void Post(PostedMessage<T> message)
         {
-            await Context.StartNew(() =>
+            var instance = message.Fanout();
+            Context.StartNew(() =>
             {
-                Handler.Invoke(null, message.Argument);
-                message.Completion.SetResult(true);
+                try
+                {
+                    Handler.Invoke(null, instance.Argument);
+                    instance.Complete();
+                }
+                catch(Exception ex)
+                {
+                    instance.MarkError(ex);
+                }
             });
         }
     }
@@ -88,9 +125,9 @@ namespace AppServiceThreadBroker
                 Handler = handler,
                 Context = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext())
             };
-            var eventHandlerThunk = new EventHandler<PostedMessage<T>>(async (_, message) =>
+            var eventHandlerThunk = new EventHandler<PostedMessage<T>>((_, message) =>
             {
-                await boundEventHandler.SignalAsync(message);
+                boundEventHandler.Post(message);
             });
 
             lock (eventSource)
@@ -105,9 +142,17 @@ namespace AppServiceThreadBroker
             PostedMessage<T> message = new PostedMessage<T> { Argument = obj };
             var task = Task.Run(() =>
             {
+                // If we have delegates bound to the event source, each one
+                // will get a fanned out PostedMessage. They will all get aggregated
+                // and returned via GetAggregatedTask() below.
                 eventSource.InvocationList?.Invoke(null, message);
+
+                // And mark the "parent" PostedMessage as being completed. This
+                // also handles the case of not having any delegates bound to the
+                // invocation list.
+                message.Complete();
             });
-            return message.Completion.Task.AsAsyncAction();
+            return message.GetAggregatedTask().AsAsyncAction();
         }
 
         static EventRegistrationTokenTable<EventHandler<PostedMessage<AppServiceConnection>>> _connectionArrivedEventSource
