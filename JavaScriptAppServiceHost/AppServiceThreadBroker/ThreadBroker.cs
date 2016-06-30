@@ -15,7 +15,7 @@ namespace AppServiceThreadBroker
 {
     class PostedMessage<T>
     {
-        public T Arguments;
+        public T Argument;
         public TaskCompletionSource<bool> Completion = new TaskCompletionSource<bool>();
     }
 
@@ -28,7 +28,7 @@ namespace AppServiceThreadBroker
         {
             await Context.StartNew(() =>
             {
-                Handler.Invoke(null, message.Arguments);
+                Handler.Invoke(null, message.Argument);
                 message.Completion.SetResult(true);
             });
         }
@@ -102,7 +102,7 @@ namespace AppServiceThreadBroker
 
         private static IAsyncAction PostToEventSource<T>(T obj, EventRegistrationTokenTable<EventHandler<PostedMessage<T>>> eventSource)
         {
-            PostedMessage<T> message = new PostedMessage<T> { Arguments = obj };
+            PostedMessage<T> message = new PostedMessage<T> { Argument = obj };
             var task = Task.Run(() =>
             {
                 eventSource.InvocationList?.Invoke(null, message);
